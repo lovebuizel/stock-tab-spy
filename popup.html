@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <title>Stock Tab Spy</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 320px;
+      background: #0f172a;
+      color: #e2e8f0;
+      font-family: 'Segoe UI', sans-serif;
+      font-size: 13px;
+    }
+
+    header {
+      background: #1e293b;
+      padding: 12px 16px;
+      display: flex; align-items: center; gap: 8px;
+      border-bottom: 1px solid #334155;
+    }
+    header h1 { font-size: 14px; font-weight: 600; }
+
+    /* ── 分頁啟用區 ── */
+    #tab-section {
+      padding: 12px 16px;
+      border-bottom: 1px solid #334155;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .tab-info { display: flex; flex-direction: column; gap: 2px; }
+    .tab-label { font-size: 13px; font-weight: 600; color: #e2e8f0; }
+    .tab-hint  { font-size: 11px; color: #94a3b8; }
+
+    /* Toggle */
+    .toggle-wrap { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+    .toggle-wrap input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; inset: 0;
+      background: #334155; border-radius: 24px;
+      transition: background .2s; cursor: pointer;
+    }
+    .slider::before {
+      content: "";
+      position: absolute;
+      width: 18px; height: 18px;
+      left: 3px; top: 3px;
+      background: #64748b; border-radius: 50%;
+      transition: transform .2s, background .2s;
+    }
+    .toggle-wrap input:checked + .slider { background: #3b82f6; }
+    .toggle-wrap input:checked + .slider::before {
+      transform: translateX(20px); background: #fff;
+    }
+
+    /* ── 主體（啟用後才顯示）── */
+    #main-body { display: none; }
+    #main-body.visible { display: block; }
+
+    #status-bar {
+      padding: 4px 16px; font-size: 11px;
+      color: #94a3b8; min-height: 22px;
+      border-bottom: 1px solid #1e293b;
+    }
+
+    /* 跑馬燈開關 */
+    #marquee-section {
+      padding: 10px 16px;
+      border-bottom: 1px solid #1e293b;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .mq-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+    .mq-label  { font-size: 13px; color: #cbd5e1; }
+    .mq-hint   { font-size: 11px; color: #94a3b8; }
+
+    /* 靜態模式：選哪一檔 */
+    #single-section {
+      padding: 8px 16px;
+      border-bottom: 1px solid #1e293b;
+      display: none;
+    }
+    #single-section .label { font-size: 11px; color: #94a3b8; margin-bottom: 6px; }
+    #single-select {
+      width: 100%;
+      background: #1e293b; border: 1px solid #334155;
+      border-radius: 6px; color: #e2e8f0;
+      padding: 6px 10px; font-size: 12px; outline: none; cursor: pointer;
+    }
+    #single-select:focus { border-color: #3b82f6; }
+
+    /* 股票列表：4 筆剛好不滾，第 5 筆起出現滾輪 */
+    #stock-list { max-height: 192px; overflow-y: auto; }
+    .stock-row {
+      display: flex; align-items: center;
+      padding: 8px 12px 8px 8px; border-bottom: 1px solid #1e293b; gap: 8px;
+      cursor: default;
+    }
+    .stock-row:hover { background: #1e293b; }
+    .stock-row.drag-over { background: #1e3a5f; border-top: 2px solid #3b82f6; }
+    .stock-row.dragging  { opacity: .4; }
+    #stock-list.is-dragging .stock-row > * { pointer-events: none; }
+    .drag-handle {
+      color: #334155; font-size: 14px; cursor: grab; flex-shrink: 0;
+      user-select: none; padding: 0 2px;
+    }
+    .drag-handle:active { cursor: grabbing; }
+    .stock-row:active   { cursor: grabbing; }
+    .sym-group  { display: flex; flex-direction: column; width: 76px; flex-shrink: 0; }
+    .sym-code   { font-size: 10px; color: #64748b; line-height: 1.2; }
+    .alias-input {
+      background: none; border: none;
+      border-bottom: 1px solid transparent;
+      color: #e2e8f0; font-size: 12px; font-weight: 600;
+      padding: 1px 0; outline: none; width: 100%;
+      transition: border-color .15s;
+    }
+    .alias-input:focus { border-bottom-color: #3b82f6; }
+    .alias-input::placeholder { color: #475569; font-weight: 400; font-size: 11px; }
+    .price   { flex: 1; font-size: 13px; font-weight: 500; }
+    .change  { font-size: 12px; width: 72px; text-align: right; }
+    .up   { color: #ef4444; }
+    .down { color: #22c55e; }
+    .flat { color: #64748b; }
+    .btn-remove {
+      background: none; border: none; color: #475569;
+      cursor: pointer; font-size: 15px; padding: 0 2px; line-height: 1;
+    }
+    .btn-remove:hover { color: #ef4444; }
+    .loading { color: #94a3b8; font-style: italic; }
+
+    /* 匯入匯出 */
+    #io-area {
+      padding: 8px 16px; display: flex; gap: 8px;
+      border-top: 1px solid #1e293b;
+    }
+    .btn-io {
+      flex: 1; background: #1e293b; border: 1px solid #334155;
+      border-radius: 6px; color: #94a3b8;
+      padding: 5px 8px; font-size: 11px; cursor: pointer; text-align: center;
+    }
+    .btn-io:hover { border-color: #3b82f6; color: #e2e8f0; }
+    #input-import { display: none; }
+
+    /* 新增 */
+    #add-area {
+      padding: 10px 16px; display: flex; gap: 8px;
+      border-top: 1px solid #1e293b;
+    }
+    #add-area input {
+      flex: 1; background: #1e293b; border: 1px solid #334155;
+      border-radius: 6px; color: #e2e8f0;
+      padding: 6px 10px; font-size: 12px; outline: none;
+    }
+    #add-area input::placeholder { color: #64748b; }
+    #add-area input:focus { border-color: #3b82f6; }
+    #btn-add {
+      background: #3b82f6; border: none; border-radius: 6px;
+      color: #fff; padding: 6px 12px; cursor: pointer;
+      font-size: 12px; font-weight: 600;
+    }
+    #btn-add:hover { background: #2563eb; }
+    #hint { padding: 2px 16px 8px; font-size: 11px; color: #cbd5e1; }
+
+    /* 未啟用提示 */
+    #disabled-hint {
+      padding: 24px 16px; text-align: center;
+      color: #cbd5e1; font-size: 12px; line-height: 1.8;
+    }
+
+    footer {
+      padding: 8px 16px; font-size: 11px; color: #94a3b8;
+      text-align: center; border-top: 1px solid #1e293b;
+    }
+    .btn-io { color: #cbd5e1; }
+  </style>
+</head>
+<body>
+  <header>
+    <span>📈</span>
+    <h1>Stock Tab Spy</h1>
+  </header>
+
+  <!-- 分頁啟用開關 -->
+  <div id="tab-section">
+    <div class="tab-info">
+      <span class="tab-label">在此分頁啟用</span>
+      <span class="tab-hint" id="tab-hint">目前未啟用</span>
+    </div>
+    <label class="toggle-wrap">
+      <input type="checkbox" id="toggle-tab" />
+      <div class="slider"></div>
+    </label>
+  </div>
+
+  <!-- 未啟用時的提示 -->
+  <div id="disabled-hint">
+    開啟上方開關，即可在此分頁<br>顯示股票跑馬燈與走勢圖示
+  </div>
+
+  <!-- 啟用後的主體 -->
+  <div id="main-body">
+    <div id="status-bar">載入中…</div>
+
+    <div id="marquee-section">
+      <label class="mq-toggle">
+        <div class="toggle-wrap">
+          <input type="checkbox" id="toggle-marquee" />
+          <div class="slider"></div>
+        </div>
+        <span class="mq-label">輪播所有股票</span>
+      </label>
+      <span class="mq-hint" id="marquee-hint">全部輪播</span>
+    </div>
+
+    <!-- 輪播模式：秒數設定 -->
+    <div id="rotate-section" style="padding:8px 16px 10px; border-bottom:1px solid #1e293b; display:flex; align-items:center; justify-content:space-between;">
+      <span style="font-size:12px; color:#94a3b8;">每檔顯示秒數</span>
+      <div style="display:flex; align-items:center; gap:6px;">
+        <input id="input-rotate-sec" type="number" min="1" max="60" value="3"
+               style="width:52px; background:#1e293b; border:1px solid #334155;
+                      border-radius:6px; color:#e2e8f0; padding:4px 8px;
+                      font-size:13px; text-align:center; outline:none;" />
+        <span style="font-size:12px; color:#94a3b8;">秒（最少 1）</span>
+      </div>
+    </div>
+
+    <div id="single-section">
+      <div class="label">顯示哪一檔</div>
+      <select id="single-select"></select>
+    </div>
+
+    <div id="stock-list"></div>
+
+    <div id="add-area">
+      <input id="input-symbol" type="text"
+             placeholder="台股: 2330.TW　美股: NVDA" maxlength="20" />
+      <button id="btn-add">＋ 新增</button>
+    </div>
+    <div id="hint">台股加 .TW（如 2330.TW），美股直接輸入代號</div>
+
+    <!-- 匯入匯出 -->
+    <div id="io-area">
+      <button class="btn-io" id="btn-export">⬇ 匯出設定</button>
+      <label  class="btn-io" id="lbl-import">⬆ 匯入設定
+        <input type="file" id="input-import" accept=".json" />
+      </label>
+    </div>
+  </div>
+
+  <footer>台股 TWSE 即時 ／ 美股 Yahoo（延遲 15–20 分鐘）</footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>

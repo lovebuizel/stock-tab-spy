@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Stock Tab Spy",
+  "version": "1.0",
+  "description": "低調在分頁追蹤台股美股行情",
+  "permissions": ["storage", "alarms", "tabs"],
+  "host_permissions": [
+    "https://query1.finance.yahoo.com/*",
+    "https://query2.finance.yahoo.com/*",
+    "https://mis.twse.com.tw/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Stock Tab Spy"
+  }
+}
