@@ -228,8 +228,13 @@ async function fetchTWStock(symbol) {
     });
   }
 
-  const history = yahoo?.history ?? [twse.price];
-  if (history.length > 0) history[history.length - 1] = twse.price;
+  let history = yahoo?.history ?? [];
+  if (history.length < 2) {
+    // Yahoo 尚無當日資料（開盤初期），用昨收→現價畫最簡基線
+    history = [twse.prevClose ?? twse.price, twse.price];
+  } else {
+    history[history.length - 1] = twse.price;
+  }
 
   return {
     symbol,
@@ -294,7 +299,7 @@ async function fetchYahooHistory(symbol) {
     if (!resp.ok) return null;
     const data   = await resp.json();
     const result = data.chart.result[0];
-    const closes = result.indicators.quote[0].close.filter((v) => v != null);
+    const closes = (result.indicators.quote[0].close ?? []).filter((v) => v != null);
     const session      = result.meta.currentTradingPeriod?.regular ?? null;
     const sessionRatio = calcSessionRatio(session);
     return { history: sampleArray(closes, 20), session, sessionRatio };
