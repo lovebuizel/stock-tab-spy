@@ -11,8 +11,6 @@
 
 ## 安裝方式
 
-> 目前為開發者模式安裝，尚未上架 Chrome Web Store。
-
 1. 下載或 clone 此專案到本機：
    ```
    git clone https://github.com/lovebuizel/stock-tab-spy.git
