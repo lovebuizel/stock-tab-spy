@@ -329,8 +329,13 @@ async function fetchYahooStock(symbol) {
     const dayLow    = Math.min(...lows,  price);
     const session      = meta.currentTradingPeriod?.regular ?? null;
     const sessionRatio = calcSessionRatio(session);
-    const history = sampleArray(closes, 20);
-    if (history.length > 0) history[history.length - 1] = price;
+    let history = sampleArray(closes, 20);
+    if (history.length < 2) {
+      // Yahoo 尚無當日 K 線（開盤初期），用昨收→現價畫最簡基線
+      history = [prevClose, price];
+    } else {
+      history[history.length - 1] = price;
+    }
 
     const tradeTime = meta.regularMarketTime
       ? new Date(meta.regularMarketTime * 1000).toLocaleString("zh-TW", {
